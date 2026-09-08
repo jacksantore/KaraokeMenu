@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Music2, Mic, FileText, Loader2 } from "lucide-react";
+import { X, Music2, Mic, FileText, Loader2, Hash } from "lucide-react";
 import type { Song, SongInput } from "@/lib/types";
 
 export default function SongFormModal({
@@ -16,6 +16,7 @@ export default function SongFormModal({
   onClose: () => void;
   onSubmit: (input: SongInput) => Promise<void>;
 }) {
+  const [code, setCode] = useState("");
   const [artist, setArtist] = useState("");
   const [title, setTitle] = useState("");
   const [lyrics, setLyrics] = useState("");
@@ -25,6 +26,7 @@ export default function SongFormModal({
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting the form when the modal opens is intentional
+      setCode(song ? String(song.code) : "");
       setArtist(song?.artist ?? "");
       setTitle(song?.title ?? "");
       setLyrics(song?.lyrics ?? "");
@@ -34,6 +36,11 @@ export default function SongFormModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const codeNumber = Number(code);
+    if (!code.trim() || !Number.isInteger(codeNumber) || codeNumber <= 0) {
+      setFormError("Informe o código da música (número usado no equipamento de karaokê).");
+      return;
+    }
     if (!artist.trim() || !title.trim()) {
       setFormError("Preencha o artista e o título da música.");
       return;
@@ -41,7 +48,7 @@ export default function SongFormModal({
     setSubmitting(true);
     setFormError(null);
     try {
-      await onSubmit({ artist, title, lyrics });
+      await onSubmit({ code: codeNumber, artist, title, lyrics });
       onClose();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Algo deu errado.");
@@ -84,18 +91,39 @@ export default function SongFormModal({
             </div>
 
             <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">
-                  <Mic size={13} /> Artista
-                </span>
-                <input
-                  value={artist}
-                  onChange={(e) => setArtist(e.target.value)}
-                  placeholder="Ex: Jorge & Mateus"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-neon-violet"
-                  autoFocus
-                />
-              </label>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-3">
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">
+                    <Hash size={13} /> Código
+                  </span>
+                  <input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Ex: 1234"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-neon-violet"
+                    autoFocus
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">
+                    <Mic size={13} /> Artista
+                  </span>
+                  <input
+                    value={artist}
+                    onChange={(e) => setArtist(e.target.value)}
+                    placeholder="Ex: Jorge & Mateus"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-neon-violet"
+                  />
+                </label>
+              </div>
+              <p className="-mt-2.5 text-[11px] text-white/35">
+                O código é o número usado para selecionar a música no equipamento de karaokê.
+              </p>
 
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">

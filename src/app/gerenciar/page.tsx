@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ListMusic } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ListMusic,
+  Mic,
+  ArrowDownAZ,
+} from "lucide-react";
 import { useSongs } from "@/hooks/useSongs";
 import SongFormModal from "@/components/SongFormModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -11,10 +21,13 @@ import type { Song, SongInput } from "@/lib/types";
 
 const PAGE_SIZE = 20;
 
+type SortBy = "artist" | "title";
+
 export default function GerenciarPage() {
   const { songs, loading, error, createSong, editSong, removeSong } = useSongs();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
+  const [sortBy, setSortBy] = useState<SortBy>("artist");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
@@ -29,13 +42,28 @@ export default function GerenciarPage() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3200);
   }
 
+  function changeSort(next: SortBy) {
+    setSortBy(next);
+    setPage(0);
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return songs;
-    return songs.filter(
-      (s) => s.artist.toLowerCase().includes(q) || s.title.toLowerCase().includes(q)
+    const base = q
+      ? songs.filter(
+          (s) =>
+            s.artist.toLowerCase().includes(q) ||
+            s.title.toLowerCase().includes(q) ||
+            String(s.code).includes(q)
+        )
+      : songs;
+
+    return [...base].sort((a, b) =>
+      sortBy === "artist"
+        ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
+        : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR")
     );
-  }, [songs, query]);
+  }, [songs, query, sortBy]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const clampedPage = Math.min(page, pageCount - 1);
@@ -101,17 +129,43 @@ export default function GerenciarPage() {
         </button>
       </motion.div>
 
-      <div className="glow-ring mt-6 flex items-center gap-2 rounded-xl glass-card px-3.5 py-2.5">
-        <Search size={17} className="shrink-0 text-white/40" />
-        <input
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(0);
-          }}
-          placeholder="Filtrar por artista ou título…"
-          className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
-        />
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="glow-ring flex flex-1 items-center gap-2 rounded-xl glass-card px-3.5 py-2.5">
+          <Search size={17} className="shrink-0 text-white/40" />
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
+            placeholder="Filtrar por código, artista ou título…"
+            className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
+          />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 rounded-xl glass-card p-1 text-xs">
+          <span className="hidden pl-2 text-white/35 sm:inline">Ordenar por</span>
+          <button
+            onClick={() => changeSort("artist")}
+            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+              sortBy === "artist"
+                ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
+                : "text-white/55 hover:text-white"
+            }`}
+          >
+            <Mic size={12} /> Artista
+          </button>
+          <button
+            onClick={() => changeSort("title")}
+            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+              sortBy === "title"
+                ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
+                : "text-white/55 hover:text-white"
+            }`}
+          >
+            <ArrowDownAZ size={12} /> Música
+          </button>
+        </div>
       </div>
 
       <div className="mt-5">
@@ -142,11 +196,19 @@ export default function GerenciarPage() {
                     key={song.id}
                     className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/5 sm:px-5"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white sm:text-base">
-                        {song.title}
-                      </p>
-                      <p className="truncate text-xs text-white/50 sm:text-sm">{song.artist}</p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className="shrink-0 rounded-lg bg-white/5 px-2 py-1 text-center text-xs font-semibold tabular-nums text-white/60"
+                        title="Código no equipamento de karaokê"
+                      >
+                        {song.code}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white sm:text-base">
+                          {song.title}
+                        </p>
+                        <p className="truncate text-xs text-white/50 sm:text-sm">{song.artist}</p>
+                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <button

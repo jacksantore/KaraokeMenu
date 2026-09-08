@@ -17,6 +17,7 @@ async function main() {
   await sql`
     CREATE TABLE IF NOT EXISTS songs (
       id text PRIMARY KEY,
+      code integer NOT NULL UNIQUE,
       artist text NOT NULL,
       title text NOT NULL,
       lyrics text NOT NULL DEFAULT '',
@@ -41,6 +42,7 @@ async function main() {
   for (let i = 0; i < songs.length; i += batchSize) {
     const batch = songs.slice(i, i + batchSize).map((s) => ({
       id: s.id,
+      code: s.code,
       artist: s.artist,
       title: s.title,
       lyrics: s.lyrics ?? "",
@@ -48,7 +50,7 @@ async function main() {
       updated_at: s.updatedAt ?? new Date().toISOString(),
     }));
     await sql`
-      INSERT INTO songs ${sql(batch, "id", "artist", "title", "lyrics", "created_at", "updated_at")}
+      INSERT INTO songs ${sql(batch, "id", "code", "artist", "title", "lyrics", "created_at", "updated_at")}
       ON CONFLICT (id) DO NOTHING
     `;
     console.log(`Importadas ${Math.min(i + batchSize, songs.length)} / ${songs.length}`);

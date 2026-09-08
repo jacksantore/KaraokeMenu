@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteSong, updateSong } from "@/lib/db";
+import { deleteSong, DuplicateCodeError, updateSong } from "@/lib/db";
+import { parseSongInput } from "@/lib/validateSongInput";
 
 export async function PUT(
   request: NextRequest,
@@ -7,25 +8,24 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await request.json().catch(() => null);
+  const parsed = parseSongInput(body);
 
-  if (!body || typeof body.artist !== "string" || !body.artist.trim() || typeof body.title !== "string" || !body.title.trim()) {
-    return NextResponse.json(
-      { error: "Informe ao menos o nome do artista e o título da música." },
-      { status: 400 }
-    );
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const song = await updateSong(id, {
-    artist: body.artist,
-    title: body.title,
-    lyrics: typeof body.lyrics === "string" ? body.lyrics : "",
-  });
-
-  if (!song) {
-    return NextResponse.json({ error: "Música não encontrada." }, { status: 404 });
+  try {
+    const song = await updateSong(id, parsed.input);
+    if (!song) {
+      return NextResponse.json({ error: "Música não encontrada." }, { status: 404 });
+    }
+    return NextResponse.json(song);
+  } catch (err) {
+    if (err instanceof DuplicateCodeError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    throw err;
   }
-
-  return NextResponse.json(song);
 }
 
 export async function DELETE(

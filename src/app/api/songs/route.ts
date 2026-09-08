@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSong, getAllSongs } from "@/lib/db";
+import { createSong, DuplicateCodeError, getAllSongs } from "@/lib/db";
+import { parseSongInput } from "@/lib/validateSongInput";
 
 export async function GET() {
   const songs = await getAllSongs();
@@ -8,19 +9,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
+  const parsed = parseSongInput(body);
 
-  if (!body || typeof body.artist !== "string" || !body.artist.trim() || typeof body.title !== "string" || !body.title.trim()) {
-    return NextResponse.json(
-      { error: "Informe ao menos o nome do artista e o título da música." },
-      { status: 400 }
-    );
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const song = await createSong({
-    artist: body.artist,
-    title: body.title,
-    lyrics: typeof body.lyrics === "string" ? body.lyrics : "",
-  });
-
-  return NextResponse.json(song, { status: 201 });
+  try {
+    const song = await createSong(parsed.input);
+    return NextResponse.json(song, { status: 201 });
+  } catch (err) {
+    if (err instanceof DuplicateCodeError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    throw err;
+  }
 }

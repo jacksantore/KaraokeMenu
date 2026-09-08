@@ -3,19 +3,26 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, X, Sparkles, Mic2 } from "lucide-react";
+import { Search, X, ListMusic, Mic2, ChevronLeft, ChevronRight, ArrowDownAZ, Mic } from "lucide-react";
 import { useSongs } from "@/hooks/useSongs";
 import SongCard from "@/components/SongCard";
 import EqualizerIcon from "@/components/EqualizerIcon";
 import { searchSongs } from "@/lib/search";
+import type { Song } from "@/lib/types";
 
 const RESULT_LIMIT = 60;
+const BROWSE_PAGE_SIZE = 24;
+
+type SortBy = "artist" | "title";
 
 export default function HomePage() {
   const { songs, loading, error } = useSongs();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const [sortBy, setSortBy] = useState<SortBy>("artist");
+  const [browsePage, setBrowsePage] = useState(0);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -36,15 +43,16 @@ export default function HomePage() {
     () =>
       new Fuse(songs, {
         keys: [
-          { name: "title", weight: 0.45 },
-          { name: "artist", weight: 0.4 },
-          { name: "lyrics", weight: 0.15 },
+          { name: "title", weight: 0.4 },
+          { name: "artist", weight: 0.35 },
+          { name: "code", weight: 0.15, getFn: (song: Song) => String(song.code) },
+          { name: "lyrics", weight: 0.1 },
         ],
         threshold: 0.32,
         distance: 200,
         ignoreLocation: true,
         includeMatches: true,
-        minMatchCharLength: 2,
+        minMatchCharLength: 1,
       }),
     [songs]
   );
@@ -55,17 +63,29 @@ export default function HomePage() {
     return searchSongs(fuse, q, RESULT_LIMIT);
   }, [fuse, deferredQuery]);
 
-  const suggestions = useMemo(() => {
-    const count = songs.length;
-    if (count === 0) return [];
-    const take = Math.min(6, count);
-    const step = Math.max(1, Math.floor(count / take));
-    const picks: typeof songs = [];
-    for (let i = 0; i < take; i++) {
-      picks.push(songs[(i * step + i * 7) % count]);
-    }
-    return picks;
-  }, [songs]);
+  const browseSongs = useMemo(() => {
+    const copy = [...songs];
+    copy.sort((a, b) => {
+      const primary =
+        sortBy === "artist"
+          ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
+          : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
+      return primary;
+    });
+    return copy;
+  }, [songs, sortBy]);
+
+  const browsePageCount = Math.max(1, Math.ceil(browseSongs.length / BROWSE_PAGE_SIZE));
+  const clampedBrowsePage = Math.min(browsePage, browsePageCount - 1);
+  const browsePageItems = browseSongs.slice(
+    clampedBrowsePage * BROWSE_PAGE_SIZE,
+    clampedBrowsePage * BROWSE_PAGE_SIZE + BROWSE_PAGE_SIZE
+  );
+
+  function changeSort(next: SortBy) {
+    setSortBy(next);
+    setBrowsePage(0);
+  }
 
   const showEmptyState = !loading && !error && !deferredQuery.trim();
   const showNoResults = !loading && results && results.length === 0;
@@ -98,7 +118,7 @@ export default function HomePage() {
           transition={{ duration: 0.5, delay: 0.15 }}
           className="mx-auto mt-3 max-w-md text-sm text-white/55 sm:text-base"
         >
-          Busque por nome da música, artista ou até um pedacinho da letra.
+          Busque por nome da música, artista, código ou até um pedacinho da letra.
         </motion.p>
       </section>
 
@@ -114,7 +134,7 @@ export default function HomePage() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ex: Evidências, Jorge & Mateus, ou “nunca mais te esquecer”…"
+            placeholder="Ex: Evidências, Jorge & Mateus, ou o código da música…"
             className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/35 outline-none sm:text-base"
             autoComplete="off"
             spellCheck={false}
@@ -171,6 +191,7 @@ export default function HomePage() {
                         title: matchMap.title,
                         artist: matchMap.artist,
                         lyrics: matchMap.lyrics,
+                        code: matchMap.code,
                       }}
                     />
                   );
@@ -198,14 +219,67 @@ export default function HomePage() {
 
         {showEmptyState && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-            <p className="mb-3 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/40">
-              <Sparkles size={13} /> Sugestões para começar
-            </p>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {suggestions.map((song, i) => (
-                <SongCard key={song.id} song={song} index={i} />
-              ))}
-            </ul>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/40">
+                <ListMusic size={13} /> Catálogo completo
+              </p>
+
+              <div className="flex items-center gap-1 rounded-full glass-card p-1 text-xs">
+                <span className="hidden pl-2 text-white/35 sm:inline">Ordenar por</span>
+                <button
+                  onClick={() => changeSort("artist")}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-medium transition-colors ${
+                    sortBy === "artist"
+                      ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
+                      : "text-white/55 hover:text-white"
+                  }`}
+                >
+                  <Mic size={12} /> Artista
+                </button>
+                <button
+                  onClick={() => changeSort("title")}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-medium transition-colors ${
+                    sortBy === "title"
+                      ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
+                      : "text-white/55 hover:text-white"
+                  }`}
+                >
+                  <ArrowDownAZ size={12} /> Música
+                </button>
+              </div>
+            </div>
+
+            <AnimatePresence mode="popLayout">
+              <motion.ul layout className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {browsePageItems.map((song, i) => (
+                  <SongCard key={song.id} song={song} index={i} />
+                ))}
+              </motion.ul>
+            </AnimatePresence>
+
+            {browsePageCount > 1 && (
+              <div className="mt-5 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setBrowsePage((p) => Math.max(0, p - 1))}
+                  disabled={clampedBrowsePage === 0}
+                  className="rounded-lg p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="text-xs text-white/40">
+                  Página {clampedBrowsePage + 1} de {browsePageCount}
+                </span>
+                <button
+                  onClick={() => setBrowsePage((p) => Math.min(browsePageCount - 1, p + 1))}
+                  disabled={clampedBrowsePage >= browsePageCount - 1}
+                  className="rounded-lg p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
+                  aria-label="Próxima página"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </div>

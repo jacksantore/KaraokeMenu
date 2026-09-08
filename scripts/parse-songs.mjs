@@ -36,6 +36,7 @@ const seen = new Set();
 for (const line of lines) {
   const match = line.match(/^(\d+)\s+(.*)$/);
   if (!match) continue;
+  const code = Number(match[1]);
   const rest = match[2].trim();
   const dashIdx = rest.indexOf(" - ");
   let artist, title;
@@ -55,6 +56,7 @@ for (const line of lines) {
 
   songs.push({
     id: String(songs.length + 1),
+    code,
     artist: titleCase(artist),
     title: titleCase(title || artist),
     lyrics: "",

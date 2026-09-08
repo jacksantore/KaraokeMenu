@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Music2, Quote } from "lucide-react";
+import { Quote } from "lucide-react";
 import type { Song } from "@/lib/types";
 import { highlightText } from "@/lib/highlight";
 
@@ -9,6 +9,7 @@ export interface SongMatches {
   artist?: readonly (readonly [number, number])[];
   title?: readonly (readonly [number, number])[];
   lyrics?: readonly (readonly [number, number])[];
+  code?: readonly (readonly [number, number])[];
 }
 
 const ACCENTS = [
@@ -59,9 +60,13 @@ export default function SongCard({
       />
       <div className="relative flex items-start gap-3">
         <div
-          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${accent} text-white shadow-lg`}
+          className={`mt-0.5 flex h-11 min-w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br ${accent} px-1.5 text-white shadow-lg`}
+          title="Código no equipamento de karaokê"
         >
-          <Music2 size={17} />
+          <span className="text-[8px] font-semibold uppercase leading-none tracking-wider text-white/75">Nº</span>
+          <span className="font-display text-base leading-none tracking-wide tabular-nums">
+            {song.code}
+          </span>
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-semibold text-white sm:text-lg">
