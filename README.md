@@ -11,7 +11,7 @@ Em produção: https://karaoke-menu.vercel.app
 - [Framer Motion](https://motion.dev) para as animações
 - [Fuse.js](https://fusejs.io) para a busca fuzzy (tolera erros de digitação e acentuação)
 - Postgres (Supabase) via [`postgres`](https://github.com/porsager/postgres) para persistência
-- [API pública do Deezer](https://developers.deezer.com/api) para buscar capa do álbum e foto do artista (sem necessidade de chave de API)
+- [API pública do Deezer](https://developers.deezer.com/api) para buscar capa do álbum, foto do artista e uma prévia de 30s da música (sem necessidade de chave de API)
 
 ## Rodando localmente
 
@@ -41,9 +41,11 @@ As músicas ficam em uma tabela `songs` no Postgres (ver `scripts/migrate-to-pos
 node --env-file=.env.local scripts/migrate-to-postgres.mjs
 ```
 
-## Imagens (artista/álbum)
+## Imagens e prévia de áudio
 
-Cada card de música busca, sob demanda (só quando o card entra na tela), a capa do álbum e a foto do artista na API pública do Deezer (`src/lib/artwork.ts`), e guarda o resultado em cache na tabela `song_artwork` — assim cada música só é consultada na Deezer uma vez. Quando não há correspondência, o card mantém o visual em gradiente com o código da música.
+Cada card de música busca, sob demanda (só quando o card entra na tela), a capa do álbum, a foto do artista e um link de prévia de 30s na API pública do Deezer (`src/lib/artwork.ts`), e guarda o resultado em cache na tabela `song_artwork` — assim cada música só é consultada na Deezer uma vez. Quando não há correspondência, o card mantém o visual em gradiente com o código da música (sempre em destaque, em fonte grande) e não mostra botão de tocar.
+
+Quando há prévia disponível, o card mostra um botão de play que toca os 30s de áudio (`src/hooks/usePreviewPlayer.ts`) — tocar uma música pausa automaticamente qualquer outra que esteja tocando.
 
 No cadastro (`/gerenciar`), o formulário tem um botão **"Buscar imagem"** para pré-visualizar a capa/foto antes de salvar (usa `GET /api/artwork/search`, sem gravar no cache ainda), e também busca automaticamente em segundo plano assim que a música é criada ou editada, para que a imagem já esteja em cache na primeira vez que o card aparecer em qualquer listagem. Editar o artista ou o título de uma música limpa o cache dela, para não ficar com uma imagem de uma combinação antiga.
 

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Quote } from "lucide-react";
+import { Music2, Pause, Play, Quote } from "lucide-react";
 import type { Song } from "@/lib/types";
 import { highlightText } from "@/lib/highlight";
 import { useArtwork } from "@/hooks/useArtwork";
+import { usePreviewPlayer } from "@/hooks/usePreviewPlayer";
 
 export interface SongMatches {
   artist?: readonly (readonly [number, number])[];
@@ -50,6 +51,7 @@ export default function SongCard({
   const accent = ACCENTS[index % ACCENTS.length];
   const snippet = lyricsSnippet(song.lyrics, matches?.lyrics);
   const { ref, artwork } = useArtwork(song.id);
+  const { isPlaying, toggle } = usePreviewPlayer(song.id, artwork?.previewUrl ?? null);
   const [albumLoaded, setAlbumLoaded] = useState(false);
   const [albumFailed, setAlbumFailed] = useState(false);
   const [artistFailed, setArtistFailed] = useState(false);
@@ -62,15 +64,23 @@ export default function SongCard({
       <div
         className={`absolute -left-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${accent} opacity-20 blur-2xl transition-opacity duration-300 group-hover:opacity-40`}
       />
-      <div className="relative flex items-start gap-3">
-        <div className="relative mt-0.5 h-14 w-14 shrink-0">
-          <div
-            className={`h-full w-full overflow-hidden rounded-xl bg-gradient-to-br shadow-lg ${
-              showAlbumImage ? "" : accent
-            }`}
-          >
+      <div className="relative flex items-center gap-3">
+        <div
+          className={`flex h-14 min-w-[3.6rem] shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br ${accent} px-1 text-white shadow-lg`}
+          title="Código no equipamento de karaokê"
+        >
+          <span className="text-[9px] font-semibold uppercase leading-none tracking-wider text-white/75">
+            Nº
+          </span>
+          <span className="font-display text-[1.7rem] leading-none tracking-wide tabular-nums">
+            {song.code}
+          </span>
+        </div>
+
+        <div className="relative h-11 w-11 shrink-0">
+          <div className="h-full w-full overflow-hidden rounded-lg bg-white/5">
             {showAlbumImage && (
-              // eslint-disable-next-line @next/next/no-img-element -- small hotlinked thumbnails from a public API, not worth Next/Image's remote-pattern config
+              // eslint-disable-next-line @next/next/no-img-element -- small hotlinked thumbnail from a public API, not worth Next/Image's remote-pattern config
               <img
                 src={artwork!.albumImage!}
                 alt=""
@@ -83,25 +93,11 @@ export default function SongCard({
               />
             )}
             {(!showAlbumImage || !albumLoaded) && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-1 text-white">
-                <span className="text-[8px] font-semibold uppercase leading-none tracking-wider text-white/75">
-                  Nº
-                </span>
-                <span className="font-display text-base leading-none tracking-wide tabular-nums">
-                  {song.code}
-                </span>
+              <div className="flex h-full w-full items-center justify-center text-white/25">
+                <Music2 size={16} />
               </div>
             )}
           </div>
-
-          {showAlbumImage && albumLoaded && (
-            <span
-              className="absolute -bottom-1 -right-1 rounded-md border border-black/20 bg-black/70 px-1.5 py-0.5 font-display text-[11px] leading-none tracking-wide text-white shadow tabular-nums backdrop-blur-sm"
-              title="Código no equipamento de karaokê"
-            >
-              {song.code}
-            </span>
-          )}
 
           {showArtistAvatar && (
             // eslint-disable-next-line @next/next/no-img-element -- small hotlinked thumbnail from a public API
@@ -133,6 +129,25 @@ export default function SongCard({
             </p>
           )}
         </div>
+
+        {artwork?.previewUrl && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggle();
+            }}
+            aria-label={isPlaying ? "Pausar prévia" : "Tocar prévia de 30 segundos"}
+            title={isPlaying ? "Pausar prévia" : "Tocar prévia de 30 segundos"}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow transition-colors ${
+              isPlaying
+                ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
+                : "bg-white/10 text-white/70 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            {isPlaying ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+          </button>
+        )}
       </div>
     </>
   );

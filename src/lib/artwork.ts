@@ -3,16 +3,19 @@ import { sql } from "./sql";
 export interface ArtworkData {
   artistImage: string | null;
   albumImage: string | null;
+  previewUrl: string | null;
 }
 
 interface ArtworkRow {
   song_id: string;
   artist_image: string | null;
   album_image: string | null;
+  preview_url: string | null;
   found: boolean;
 }
 
 interface DeezerTrack {
+  preview?: string;
   artist?: { picture_medium?: string };
   album?: { cover_medium?: string };
 }
@@ -32,10 +35,11 @@ export async function searchArtwork(artist: string, title: string): Promise<Artw
     if (!res.ok) return null;
     const json = (await res.json()) as DeezerSearchResponse;
     const track = json.data?.[0];
-    if (!track) return { artistImage: null, albumImage: null };
+    if (!track) return { artistImage: null, albumImage: null, previewUrl: null };
     return {
       artistImage: track.artist?.picture_medium ?? null,
       albumImage: track.album?.cover_medium ?? null,
+      previewUrl: track.preview ?? null,
     };
   } catch {
     return null;
@@ -45,33 +49,42 @@ export async function searchArtwork(artist: string, title: string): Promise<Artw
 }
 
 /**
- * Looks up artist/album artwork for a song, caching results in Postgres so
- * we only hit the public Deezer API once per song. Returns empty images
- * (not an error) when nothing is found, so callers can render a fallback.
+ * Looks up artist/album artwork (and a 30s preview clip) for a song, caching
+ * results in Postgres so we only hit the public Deezer API once per song.
+ * Returns empty fields (not an error) when nothing is found, so callers can
+ * render a fallback.
  */
 export async function getArtwork(songId: string, artist: string, title: string): Promise<ArtworkData> {
   const [cached] = await sql<ArtworkRow[]>`
-    SELECT song_id, artist_image, album_image, found
+    SELECT song_id, artist_image, album_image, preview_url, found
     FROM song_artwork
     WHERE song_id = ${songId}
   `;
-  if (cached) {
-    return { artistImage: cached.artist_image, albumImage: cached.album_image };
+  // A row cached before preview_url existed has found=true but no preview —
+  // refresh it once instead of trusting the stale null forever.
+  const needsBackfill = cached && cached.found && cached.preview_url === null;
+  if (cached && !needsBackfill) {
+    return {
+      artistImage: cached.artist_image,
+      albumImage: cached.album_image,
+      previewUrl: cached.preview_url,
+    };
   }
 
   const result = await searchArtwork(artist, title);
   if (result === null) {
     // Transient failure (timeout/network) — don't cache, allow retry later.
-    return { artistImage: null, albumImage: null };
+    return { artistImage: null, albumImage: null, previewUrl: null };
   }
 
   const found = Boolean(result.artistImage || result.albumImage);
   await sql`
-    INSERT INTO song_artwork (song_id, artist_image, album_image, found)
-    VALUES (${songId}, ${result.artistImage}, ${result.albumImage}, ${found})
+    INSERT INTO song_artwork (song_id, artist_image, album_image, preview_url, found)
+    VALUES (${songId}, ${result.artistImage}, ${result.albumImage}, ${result.previewUrl}, ${found})
     ON CONFLICT (song_id) DO UPDATE SET
       artist_image = EXCLUDED.artist_image,
       album_image = EXCLUDED.album_image,
+      preview_url = EXCLUDED.preview_url,
       found = EXCLUDED.found,
       fetched_at = now()
   `;

@@ -9,17 +9,8 @@ if (!connectionString) {
 const sql = postgres(connectionString, { ssl: "require" });
 
 async function main() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS song_artwork (
-      song_id text PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE,
-      artist_image text,
-      album_image text,
-      preview_url text,
-      found boolean NOT NULL,
-      fetched_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-  console.log("Tabela 'song_artwork' pronta.");
+  await sql`ALTER TABLE song_artwork ADD COLUMN IF NOT EXISTS preview_url text`;
+  console.log("Coluna 'preview_url' garantida em song_artwork.");
   await sql.end({ timeout: 1 });
 }
 

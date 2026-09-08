@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 export interface ArtworkData {
   artistImage: string | null;
   albumImage: string | null;
+  previewUrl: string | null;
 }
 
 const cache = new Map<string, ArtworkData>();
