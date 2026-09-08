@@ -21,7 +21,7 @@ interface DeezerSearchResponse {
   data?: DeezerTrack[];
 }
 
-async function searchDeezer(artist: string, title: string): Promise<ArtworkData | null> {
+export async function searchArtwork(artist: string, title: string): Promise<ArtworkData | null> {
   const query = `artist:"${artist}" track:"${title}"`;
   const url = `https://api.deezer.com/search?limit=1&q=${encodeURIComponent(query)}`;
 
@@ -59,7 +59,7 @@ export async function getArtwork(songId: string, artist: string, title: string):
     return { artistImage: cached.artist_image, albumImage: cached.album_image };
   }
 
-  const result = await searchDeezer(artist, title);
+  const result = await searchArtwork(artist, title);
   if (result === null) {
     // Transient failure (timeout/network) — don't cache, allow retry later.
     return { artistImage: null, albumImage: null };

@@ -70,6 +70,10 @@ export async function createSong(input: SongInput): Promise<Song> {
 
 export async function updateSong(id: string, input: SongInput): Promise<Song | null> {
   try {
+    const [previous] = await sql<Pick<SongRow, "artist" | "title">[]>`
+      SELECT artist, title FROM songs WHERE id = ${id}
+    `;
+
     const [row] = await sql<SongRow[]>`
       UPDATE songs
       SET code = ${input.code},
@@ -80,7 +84,15 @@ export async function updateSong(id: string, input: SongInput): Promise<Song | n
       WHERE id = ${id}
       RETURNING id, code, artist, title, lyrics, created_at, updated_at
     `;
-    return row ? toSong(row) : null;
+    if (!row) return null;
+
+    // Artist/title changed — the cached artwork (if any) no longer matches; drop it
+    // so the next lookup fetches fresh artwork for the new artist/title.
+    if (previous && (previous.artist !== row.artist || previous.title !== row.title)) {
+      await sql`DELETE FROM song_artwork WHERE song_id = ${id}`;
+    }
+
+    return toSong(row);
   } catch (err) {
     if (isUniqueViolation(err)) throw new DuplicateCodeError(input.code);
     throw err;

@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Song, SongInput } from "@/lib/types";
 
+function warmArtwork(songId: string) {
+  // Fire-and-forget: populates the song_artwork cache so the card shows an
+  // image on first render instead of waiting for it to scroll into view.
+  fetch(`/api/songs/${songId}/artwork`).catch(() => {});
+}
+
 export function useSongs() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +46,7 @@ export function useSongs() {
     }
     const song = (await res.json()) as Song;
     setSongs((prev) => [...prev, song]);
+    warmArtwork(song.id);
     return song;
   }, []);
 
@@ -55,6 +62,7 @@ export function useSongs() {
     }
     const song = (await res.json()) as Song;
     setSongs((prev) => prev.map((s) => (s.id === id ? song : s)));
+    warmArtwork(song.id);
     return song;
   }, []);
 

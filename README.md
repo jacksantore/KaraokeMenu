@@ -43,7 +43,11 @@ node --env-file=.env.local scripts/migrate-to-postgres.mjs
 
 ## Imagens (artista/álbum)
 
-Cada card de música busca, sob demanda (só quando o card entra na tela), a capa do álbum e a foto do artista na API pública do Deezer (`src/lib/artwork.ts`), e guarda o resultado em cache na tabela `song_artwork` — assim cada música só é consultada na Deezer uma vez. Quando não há correspondência, o card mantém o visual em gradiente com o código da música. A tabela é criada por:
+Cada card de música busca, sob demanda (só quando o card entra na tela), a capa do álbum e a foto do artista na API pública do Deezer (`src/lib/artwork.ts`), e guarda o resultado em cache na tabela `song_artwork` — assim cada música só é consultada na Deezer uma vez. Quando não há correspondência, o card mantém o visual em gradiente com o código da música.
+
+No cadastro (`/gerenciar`), o formulário tem um botão **"Buscar imagem"** para pré-visualizar a capa/foto antes de salvar (usa `GET /api/artwork/search`, sem gravar no cache ainda), e também busca automaticamente em segundo plano assim que a música é criada ou editada, para que a imagem já esteja em cache na primeira vez que o card aparecer em qualquer listagem. Editar o artista ou o título de uma música limpa o cache dela, para não ficar com uma imagem de uma combinação antiga.
+
+A tabela `song_artwork` é criada por:
 
 ```bash
 node --env-file=.env.local scripts/add-artwork-table.mjs

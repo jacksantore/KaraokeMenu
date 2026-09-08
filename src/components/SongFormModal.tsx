@@ -2,8 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Music2, Mic, FileText, Loader2, Hash } from "lucide-react";
+import { X, Music2, Mic, FileText, Loader2, Hash, ImageIcon, Search } from "lucide-react";
 import type { Song, SongInput } from "@/lib/types";
+
+interface RawArtwork {
+  artistImage: string | null;
+  albumImage: string | null;
+}
+
+type ArtworkState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "found"; artistImage: string | null; albumImage: string | null }
+  | { status: "empty" }
+  | { status: "error"; message: string };
 
 export default function SongFormModal({
   open,
@@ -22,6 +34,7 @@ export default function SongFormModal({
   const [lyrics, setLyrics] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [artwork, setArtwork] = useState<ArtworkState>({ status: "idle" });
 
   useEffect(() => {
     if (open) {
@@ -33,6 +46,50 @@ export default function SongFormModal({
       setFormError(null);
     }
   }, [open, song]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (!song) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting the preview when opening for a new song is intentional
+      setArtwork({ status: "idle" });
+      return;
+    }
+
+    setArtwork({ status: "loading" });
+    fetch(`/api/songs/${song.id}/artwork`)
+      .then((res) => (res.ok ? (res.json() as Promise<RawArtwork>) : null))
+      .then((data) => {
+        if (!data) {
+          setArtwork({ status: "error", message: "Não foi possível carregar a imagem atual." });
+        } else if (data.artistImage || data.albumImage) {
+          setArtwork({ status: "found", ...data });
+        } else {
+          setArtwork({ status: "empty" });
+        }
+      })
+      .catch(() => setArtwork({ status: "error", message: "Não foi possível carregar a imagem atual." }));
+  }, [open, song]);
+
+  async function handleSearchArtwork() {
+    if (!artist.trim() || !title.trim()) return;
+    setArtwork({ status: "loading" });
+    try {
+      const params = new URLSearchParams({ artist: artist.trim(), title: title.trim() });
+      const res = await fetch(`/api/artwork/search?${params.toString()}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setArtwork({ status: "error", message: data?.error ?? "Não foi possível buscar agora." });
+        return;
+      }
+      const { artistImage, albumImage } = data as RawArtwork;
+      setArtwork(
+        artistImage || albumImage ? { status: "found", artistImage, albumImage } : { status: "empty" }
+      );
+    } catch {
+      setArtwork({ status: "error", message: "Não foi possível buscar agora." });
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +113,8 @@ export default function SongFormModal({
       setSubmitting(false);
     }
   }
+
+  const canSearchArtwork = artist.trim().length > 0 && title.trim().length > 0;
 
   return (
     <AnimatePresence>
@@ -136,6 +195,75 @@ export default function SongFormModal({
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-neon-violet"
                 />
               </label>
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">
+                    <ImageIcon size={13} /> Imagem (Deezer)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSearchArtwork}
+                    disabled={!canSearchArtwork || artwork.status === "loading"}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {artwork.status === "loading" ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Search size={12} />
+                    )}
+                    {artwork.status === "found" || artwork.status === "empty"
+                      ? "Buscar novamente"
+                      : "Buscar imagem"}
+                  </button>
+                </div>
+
+                <div className="mt-2.5">
+                  {artwork.status === "found" && (
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-11 w-11 shrink-0">
+                        <div className="h-full w-full overflow-hidden rounded-lg bg-white/10">
+                          {artwork.albumImage && (
+                            // eslint-disable-next-line @next/next/no-img-element -- small hotlinked preview from a public API
+                            <img
+                              src={artwork.albumImage}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          )}
+                        </div>
+                        {artwork.artistImage && (
+                          // eslint-disable-next-line @next/next/no-img-element -- small hotlinked preview from a public API
+                          <img
+                            src={artwork.artistImage}
+                            alt=""
+                            className="absolute -left-1.5 -top-1.5 h-5 w-5 rounded-full border-2 border-card object-cover"
+                          />
+                        )}
+                      </div>
+                      <p className="text-xs text-emerald-300/85">
+                        Imagem encontrada — vai aparecer na busca e nas listagens.
+                      </p>
+                    </div>
+                  )}
+                  {artwork.status === "empty" && (
+                    <p className="text-xs text-white/40">
+                      Nenhuma imagem encontrada no Deezer para esse artista/música.
+                    </p>
+                  )}
+                  {artwork.status === "error" && (
+                    <p className="text-xs text-red-300/80">{artwork.message}</p>
+                  )}
+                  {artwork.status === "idle" && (
+                    <p className="text-xs text-white/35">
+                      Preencha artista e música e clique em buscar para ver uma prévia (opcional — também é buscado automaticamente ao salvar).
+                    </p>
+                  )}
+                  {artwork.status === "loading" && (
+                    <p className="text-xs text-white/35">Buscando…</p>
+                  )}
+                </div>
+              </div>
 
               <label className="block">
                 <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">

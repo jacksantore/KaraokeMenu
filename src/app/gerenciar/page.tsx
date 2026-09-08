@@ -34,7 +34,7 @@ export default function GerenciarPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<SortBy>("artist");
-  const [pageSize, setPageSize] = useState<PageSize>(20);
+  const [pageSize, setPageSize] = useState<PageSize>(24);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
