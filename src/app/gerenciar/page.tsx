@@ -12,22 +12,29 @@ import {
   ListMusic,
   Mic,
   ArrowDownAZ,
+  Hash,
 } from "lucide-react";
 import { useSongs } from "@/hooks/useSongs";
 import SongFormModal from "@/components/SongFormModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Toaster, { type ToastItem } from "@/components/Toaster";
 import type { Song, SongInput } from "@/lib/types";
+import ListControls, { type PageSize } from "@/components/ListControls";
 
-const PAGE_SIZE = 20;
+type SortBy = "artist" | "title" | "code";
 
-type SortBy = "artist" | "title";
+const SORT_OPTIONS = [
+  { value: "artist" as const, label: "Artista", icon: Mic },
+  { value: "title" as const, label: "Música", icon: ArrowDownAZ },
+  { value: "code" as const, label: "Código", icon: Hash },
+];
 
 export default function GerenciarPage() {
   const { songs, loading, error, createSong, editSong, removeSong } = useSongs();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<SortBy>("artist");
+  const [pageSize, setPageSize] = useState<PageSize>(20);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
@@ -47,6 +54,11 @@ export default function GerenciarPage() {
     setPage(0);
   }
 
+  function changePageSize(next: PageSize) {
+    setPageSize(next);
+    setPage(0);
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = q
@@ -58,16 +70,21 @@ export default function GerenciarPage() {
         )
       : songs;
 
-    return [...base].sort((a, b) =>
-      sortBy === "artist"
+    return [...base].sort((a, b) => {
+      if (sortBy === "code") return a.code - b.code;
+      return sortBy === "artist"
         ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
-        : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR")
-    );
+        : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
+    });
   }, [songs, query, sortBy]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const effectivePageSize = pageSize === "all" ? Math.max(filtered.length, 1) : pageSize;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / effectivePageSize));
   const clampedPage = Math.min(page, pageCount - 1);
-  const pageItems = filtered.slice(clampedPage * PAGE_SIZE, clampedPage * PAGE_SIZE + PAGE_SIZE);
+  const pageItems = filtered.slice(
+    clampedPage * effectivePageSize,
+    clampedPage * effectivePageSize + effectivePageSize
+  );
 
   function openCreate() {
     setEditingSong(null);
@@ -143,29 +160,13 @@ export default function GerenciarPage() {
           />
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 rounded-xl glass-card p-1 text-xs">
-          <span className="hidden pl-2 text-white/35 sm:inline">Ordenar por</span>
-          <button
-            onClick={() => changeSort("artist")}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 font-medium transition-colors ${
-              sortBy === "artist"
-                ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
-                : "text-white/55 hover:text-white"
-            }`}
-          >
-            <Mic size={12} /> Artista
-          </button>
-          <button
-            onClick={() => changeSort("title")}
-            className={`flex items-center gap-1 rounded-lg px-3 py-1.5 font-medium transition-colors ${
-              sortBy === "title"
-                ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
-                : "text-white/55 hover:text-white"
-            }`}
-          >
-            <ArrowDownAZ size={12} /> Música
-          </button>
-        </div>
+        <ListControls
+          sortBy={sortBy}
+          onSortByChange={changeSort}
+          sortOptions={SORT_OPTIONS}
+          pageSize={pageSize}
+          onPageSizeChange={changePageSize}
+        />
       </div>
 
       <div className="mt-5">

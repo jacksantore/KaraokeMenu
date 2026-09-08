@@ -1,6 +1,6 @@
 # Karaokê Menu
 
-Catálogo de músicas do karaokê (Karaokê Party Box) com busca por **nome da música**, **artista** ou **trecho da letra**, e uma área de **cadastro** para incluir, editar e excluir músicas.
+Catálogo de músicas do karaokê (Karaokê Party Box) com busca por **nome da música**, **artista**, **código** (o número usado para selecionar a música no equipamento) ou **trecho da letra**, listagem completa ordenável e paginável, capa de álbum/foto do artista buscadas automaticamente, e uma área de **cadastro** para incluir, editar e excluir músicas.
 
 Em produção: https://karaoke-menu.vercel.app
 
@@ -11,6 +11,7 @@ Em produção: https://karaoke-menu.vercel.app
 - [Framer Motion](https://motion.dev) para as animações
 - [Fuse.js](https://fusejs.io) para a busca fuzzy (tolera erros de digitação e acentuação)
 - Postgres (Supabase) via [`postgres`](https://github.com/porsager/postgres) para persistência
+- [API pública do Deezer](https://developers.deezer.com/api) para buscar capa do álbum e foto do artista (sem necessidade de chave de API)
 
 ## Rodando localmente
 
@@ -40,6 +41,14 @@ As músicas ficam em uma tabela `songs` no Postgres (ver `scripts/migrate-to-pos
 node --env-file=.env.local scripts/migrate-to-postgres.mjs
 ```
 
+## Imagens (artista/álbum)
+
+Cada card de música busca, sob demanda (só quando o card entra na tela), a capa do álbum e a foto do artista na API pública do Deezer (`src/lib/artwork.ts`), e guarda o resultado em cache na tabela `song_artwork` — assim cada música só é consultada na Deezer uma vez. Quando não há correspondência, o card mantém o visual em gradiente com o código da música. A tabela é criada por:
+
+```bash
+node --env-file=.env.local scripts/add-artwork-table.mjs
+```
+
 ## Variáveis de ambiente
 
 | Variável | Uso |
@@ -56,14 +65,19 @@ src/
   app/
     page.tsx                 # tela de busca
     gerenciar/page.tsx       # tela de cadastro (CRUD)
-    api/songs/route.ts       # GET (listar) / POST (criar)
-    api/songs/[id]/route.ts  # PUT (editar) / DELETE (excluir)
-  components/                # UI (cards, modal, navbar, etc.)
-  hooks/useSongs.ts           # busca e mutações via API
+    api/songs/route.ts               # GET (listar) / POST (criar)
+    api/songs/[id]/route.ts          # PUT (editar) / DELETE (excluir)
+    api/songs/[id]/artwork/route.ts  # GET (capa/foto, com cache)
+  components/                # UI (cards, modal, navbar, controles de lista, etc.)
+  hooks/
+    useSongs.ts              # busca e mutações via API
+    useArtwork.ts            # busca preguiçosa (IntersectionObserver) de capa/foto
   lib/
     sql.ts                   # conexão com o Postgres
     db.ts                    # queries (getAllSongs/createSong/updateSong/deleteSong)
-    search.ts                # lógica de busca (fuzzy + multi-palavra)
+    artwork.ts                # busca na API do Deezer + cache em song_artwork
+    search.ts                 # lógica de busca (fuzzy + multi-palavra)
+    validateSongInput.ts      # validação compartilhada do payload das rotas
     types.ts
 data/songs.json               # semente inicial do catálogo (não lido em runtime)
 scripts/                      # importação do PDF -> JSON -> Postgres

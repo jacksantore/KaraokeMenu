@@ -3,17 +3,24 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, X, ListMusic, Mic2, ChevronLeft, ChevronRight, ArrowDownAZ, Mic } from "lucide-react";
+import { Search, X, ListMusic, Mic2, ChevronLeft, ChevronRight, ArrowDownAZ, Mic, Hash } from "lucide-react";
 import { useSongs } from "@/hooks/useSongs";
 import SongCard from "@/components/SongCard";
 import EqualizerIcon from "@/components/EqualizerIcon";
 import { searchSongs } from "@/lib/search";
 import type { Song } from "@/lib/types";
+import ListControls, { type PageSize } from "@/components/ListControls";
 
 const RESULT_LIMIT = 60;
-const BROWSE_PAGE_SIZE = 24;
+const REDUCE_MOTION_THRESHOLD = 60;
 
-type SortBy = "artist" | "title";
+type SortBy = "artist" | "title" | "code";
+
+const SORT_OPTIONS = [
+  { value: "artist" as const, label: "Artista", icon: Mic },
+  { value: "title" as const, label: "Música", icon: ArrowDownAZ },
+  { value: "code" as const, label: "Código", icon: Hash },
+];
 
 export default function HomePage() {
   const { songs, loading, error } = useSongs();
@@ -23,6 +30,7 @@ export default function HomePage() {
 
   const [sortBy, setSortBy] = useState<SortBy>("artist");
   const [browsePage, setBrowsePage] = useState(0);
+  const [pageSize, setPageSize] = useState<PageSize>(24);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -66,24 +74,30 @@ export default function HomePage() {
   const browseSongs = useMemo(() => {
     const copy = [...songs];
     copy.sort((a, b) => {
-      const primary =
-        sortBy === "artist"
-          ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
-          : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
-      return primary;
+      if (sortBy === "code") return a.code - b.code;
+      return sortBy === "artist"
+        ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
+        : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
     });
     return copy;
   }, [songs, sortBy]);
 
-  const browsePageCount = Math.max(1, Math.ceil(browseSongs.length / BROWSE_PAGE_SIZE));
+  const effectivePageSize = pageSize === "all" ? Math.max(browseSongs.length, 1) : pageSize;
+  const browsePageCount = Math.max(1, Math.ceil(browseSongs.length / effectivePageSize));
   const clampedBrowsePage = Math.min(browsePage, browsePageCount - 1);
   const browsePageItems = browseSongs.slice(
-    clampedBrowsePage * BROWSE_PAGE_SIZE,
-    clampedBrowsePage * BROWSE_PAGE_SIZE + BROWSE_PAGE_SIZE
+    clampedBrowsePage * effectivePageSize,
+    clampedBrowsePage * effectivePageSize + effectivePageSize
   );
+  const reduceBrowseMotion = browsePageItems.length > REDUCE_MOTION_THRESHOLD;
 
   function changeSort(next: SortBy) {
     setSortBy(next);
+    setBrowsePage(0);
+  }
+
+  function changePageSize(next: PageSize) {
+    setPageSize(next);
     setBrowsePage(0);
   }
 
@@ -221,41 +235,33 @@ export default function HomePage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/40">
-                <ListMusic size={13} /> Catálogo completo
+                <ListMusic size={13} /> Catálogo completo · {browseSongs.length.toLocaleString("pt-BR")} músicas
               </p>
 
-              <div className="flex items-center gap-1 rounded-full glass-card p-1 text-xs">
-                <span className="hidden pl-2 text-white/35 sm:inline">Ordenar por</span>
-                <button
-                  onClick={() => changeSort("artist")}
-                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-medium transition-colors ${
-                    sortBy === "artist"
-                      ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
-                      : "text-white/55 hover:text-white"
-                  }`}
-                >
-                  <Mic size={12} /> Artista
-                </button>
-                <button
-                  onClick={() => changeSort("title")}
-                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-medium transition-colors ${
-                    sortBy === "title"
-                      ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
-                      : "text-white/55 hover:text-white"
-                  }`}
-                >
-                  <ArrowDownAZ size={12} /> Música
-                </button>
-              </div>
+              <ListControls
+                sortBy={sortBy}
+                onSortByChange={changeSort}
+                sortOptions={SORT_OPTIONS}
+                pageSize={pageSize}
+                onPageSizeChange={changePageSize}
+              />
             </div>
 
-            <AnimatePresence mode="popLayout">
-              <motion.ul layout className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {reduceBrowseMotion ? (
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {browsePageItems.map((song, i) => (
-                  <SongCard key={song.id} song={song} index={i} />
+                  <SongCard key={song.id} song={song} index={i} reduceMotion />
                 ))}
-              </motion.ul>
-            </AnimatePresence>
+              </ul>
+            ) : (
+              <AnimatePresence mode="popLayout">
+                <motion.ul layout className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {browsePageItems.map((song, i) => (
+                    <SongCard key={song.id} song={song} index={i} />
+                  ))}
+                </motion.ul>
+              </AnimatePresence>
+            )}
 
             {browsePageCount > 1 && (
               <div className="mt-5 flex items-center justify-center gap-3">

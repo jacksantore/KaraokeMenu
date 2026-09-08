@@ -44,6 +44,15 @@ export async function getAllSongs(): Promise<Song[]> {
   return rows.map(toSong);
 }
 
+export async function getSongById(id: string): Promise<Song | null> {
+  const [row] = await sql<SongRow[]>`
+    SELECT id, code, artist, title, lyrics, created_at, updated_at
+    FROM songs
+    WHERE id = ${id}
+  `;
+  return row ? toSong(row) : null;
+}
+
 export async function createSong(input: SongInput): Promise<Song> {
   const id = nanoid(10);
   try {

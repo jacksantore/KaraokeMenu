@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Quote } from "lucide-react";
 import type { Song } from "@/lib/types";
 import { highlightText } from "@/lib/highlight";
+import { useArtwork } from "@/hooks/useArtwork";
 
 export interface SongMatches {
   artist?: readonly (readonly [number, number])[];
@@ -37,37 +39,82 @@ export default function SongCard({
   song,
   matches,
   index,
+  reduceMotion,
 }: {
   song: Song;
   matches?: SongMatches;
   index: number;
+  /** Skip entrance/layout animation — use for very long lists (e.g. "show all"). */
+  reduceMotion?: boolean;
 }) {
   const accent = ACCENTS[index % ACCENTS.length];
   const snippet = lyricsSnippet(song.lyrics, matches?.lyrics);
+  const { ref, artwork } = useArtwork(song.id);
+  const [albumLoaded, setAlbumLoaded] = useState(false);
+  const [albumFailed, setAlbumFailed] = useState(false);
+  const [artistFailed, setArtistFailed] = useState(false);
 
-  return (
-    <motion.li
-      layout
-      initial={{ opacity: 0, y: 16, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.98 }}
-      transition={{ duration: 0.28, delay: Math.min(index, 8) * 0.03, ease: "easeOut" }}
-      whileHover={{ y: -3 }}
-      className="group relative overflow-hidden rounded-2xl glass-card p-4 sm:p-5"
-    >
+  const showAlbumImage = Boolean(artwork?.albumImage) && !albumFailed;
+  const showArtistAvatar = Boolean(artwork?.artistImage) && !artistFailed;
+
+  const content = (
+    <>
       <div
         className={`absolute -left-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${accent} opacity-20 blur-2xl transition-opacity duration-300 group-hover:opacity-40`}
       />
       <div className="relative flex items-start gap-3">
-        <div
-          className={`mt-0.5 flex h-11 min-w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-gradient-to-br ${accent} px-1.5 text-white shadow-lg`}
-          title="Código no equipamento de karaokê"
-        >
-          <span className="text-[8px] font-semibold uppercase leading-none tracking-wider text-white/75">Nº</span>
-          <span className="font-display text-base leading-none tracking-wide tabular-nums">
-            {song.code}
-          </span>
+        <div className="relative mt-0.5 h-14 w-14 shrink-0">
+          <div
+            className={`h-full w-full overflow-hidden rounded-xl bg-gradient-to-br shadow-lg ${
+              showAlbumImage ? "" : accent
+            }`}
+          >
+            {showAlbumImage && (
+              // eslint-disable-next-line @next/next/no-img-element -- small hotlinked thumbnails from a public API, not worth Next/Image's remote-pattern config
+              <img
+                src={artwork!.albumImage!}
+                alt=""
+                loading="lazy"
+                onLoad={() => setAlbumLoaded(true)}
+                onError={() => setAlbumFailed(true)}
+                className={`h-full w-full object-cover transition-opacity duration-300 ${
+                  albumLoaded ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            )}
+            {(!showAlbumImage || !albumLoaded) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-1 text-white">
+                <span className="text-[8px] font-semibold uppercase leading-none tracking-wider text-white/75">
+                  Nº
+                </span>
+                <span className="font-display text-base leading-none tracking-wide tabular-nums">
+                  {song.code}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {showAlbumImage && albumLoaded && (
+            <span
+              className="absolute -bottom-1 -right-1 rounded-md border border-black/20 bg-black/70 px-1.5 py-0.5 font-display text-[11px] leading-none tracking-wide text-white shadow tabular-nums backdrop-blur-sm"
+              title="Código no equipamento de karaokê"
+            >
+              {song.code}
+            </span>
+          )}
+
+          {showArtistAvatar && (
+            // eslint-disable-next-line @next/next/no-img-element -- small hotlinked thumbnail from a public API
+            <img
+              src={artwork!.artistImage!}
+              alt=""
+              loading="lazy"
+              onError={() => setArtistFailed(true)}
+              className="absolute -left-1.5 -top-1.5 h-5 w-5 rounded-full border-2 border-card object-cover shadow"
+            />
+          )}
         </div>
+
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-semibold text-white sm:text-lg">
             {highlightText(song.title, matches?.title)}
@@ -87,6 +134,29 @@ export default function SongCard({
           )}
         </div>
       </div>
+    </>
+  );
+
+  if (reduceMotion) {
+    return (
+      <li ref={ref} className="group relative overflow-hidden rounded-2xl glass-card p-4 sm:p-5">
+        {content}
+      </li>
+    );
+  }
+
+  return (
+    <motion.li
+      ref={ref}
+      layout
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.98 }}
+      transition={{ duration: 0.28, delay: Math.min(index, 8) * 0.03, ease: "easeOut" }}
+      whileHover={{ y: -3 }}
+      className="group relative overflow-hidden rounded-2xl glass-card p-4 sm:p-5"
+    >
+      {content}
     </motion.li>
   );
 }
