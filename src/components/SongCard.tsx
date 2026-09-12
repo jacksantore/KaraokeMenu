@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Music2, Pause, Play, Quote } from "lucide-react";
+import { Loader2, Music2, Pause, Play, Quote } from "lucide-react";
 import type { Song } from "@/lib/types";
 import { highlightText } from "@/lib/highlight";
 import { useArtwork } from "@/hooks/useArtwork";
@@ -51,7 +51,7 @@ export default function SongCard({
   const accent = ACCENTS[index % ACCENTS.length];
   const snippet = lyricsSnippet(song.lyrics, matches?.lyrics);
   const { ref, artwork } = useArtwork(song.id);
-  const { isPlaying, toggle } = usePreviewPlayer(song.id, artwork?.previewUrl ?? null);
+  const { isPlaying, isLoading, toggle } = usePreviewPlayer(song.id, Boolean(artwork?.hasPreview));
   const [albumLoaded, setAlbumLoaded] = useState(false);
   const [albumFailed, setAlbumFailed] = useState(false);
   const [artistFailed, setArtistFailed] = useState(false);
@@ -130,22 +130,29 @@ export default function SongCard({
           )}
         </div>
 
-        {artwork?.previewUrl && (
+        {artwork?.hasPreview && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               toggle();
             }}
+            disabled={isLoading}
             aria-label={isPlaying ? "Pausar prévia" : "Tocar prévia de 30 segundos"}
             title={isPlaying ? "Pausar prévia" : "Tocar prévia de 30 segundos"}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow transition-colors ${
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full shadow transition-colors disabled:cursor-wait ${
               isPlaying
                 ? "bg-gradient-to-r from-neon-pink to-neon-violet text-white"
                 : "bg-white/10 text-white/70 hover:bg-white/15 hover:text-white"
             }`}
           >
-            {isPlaying ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+            {isLoading ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : isPlaying ? (
+              <Pause size={15} />
+            ) : (
+              <Play size={15} className="ml-0.5" />
+            )}
           </button>
         )}
       </div>

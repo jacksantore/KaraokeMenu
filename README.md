@@ -43,9 +43,9 @@ node --env-file=.env.local scripts/migrate-to-postgres.mjs
 
 ## Imagens e prévia de áudio
 
-Cada card de música busca, sob demanda (só quando o card entra na tela), a capa do álbum, a foto do artista e um link de prévia de 30s na API pública do Deezer (`src/lib/artwork.ts`), e guarda o resultado em cache na tabela `song_artwork` — assim cada música só é consultada na Deezer uma vez. Quando não há correspondência, o card mantém o visual em gradiente com o código da música (sempre em destaque, em fonte grande) e não mostra botão de tocar.
+Cada card de música busca, sob demanda (só quando o card entra na tela), a capa do álbum e a foto do artista na API pública do Deezer (`src/lib/artwork.ts`), e guarda o resultado em cache na tabela `song_artwork` — assim cada música só é consultada na Deezer uma vez. Quando não há correspondência, o card mantém o visual em gradiente com o código da música (sempre em destaque, em fonte grande) e não mostra botão de tocar.
 
-Quando há prévia disponível, o card mostra um botão de play que toca os 30s de áudio (`src/hooks/usePreviewPlayer.ts`) — tocar uma música pausa automaticamente qualquer outra que esteja tocando.
+Quando a música tem prévia disponível, o card mostra um botão de play (`src/hooks/usePreviewPlayer.ts`) — tocar uma música pausa automaticamente qualquer outra que esteja tocando. **O link de áudio em si nunca é cacheado**: só guardamos se a música *tem* prévia (`has_preview`, permanente); o link assinado da Deezer expira em minutos, então ele é buscado sempre na hora do clique (`GET /api/songs/[id]/preview`, sem cache — foi esse cache que quebrava a prévia depois de um tempo).
 
 No cadastro (`/gerenciar`), o formulário tem um botão **"Buscar imagem"** para pré-visualizar a capa/foto antes de salvar (usa `GET /api/artwork/search`, sem gravar no cache ainda), e também busca automaticamente em segundo plano assim que a música é criada ou editada, para que a imagem já esteja em cache na primeira vez que o card aparecer em qualquer listagem. Editar o artista ou o título de uma música limpa o cache dela, para não ficar com uma imagem de uma combinação antiga.
 

@@ -17,11 +17,7 @@ function stop() {
   notify();
 }
 
-function play(id: string, url: string) {
-  if (currentId === id) {
-    stop();
-    return;
-  }
+function playUrl(id: string, url: string) {
   stop();
   const audio = new Audio(url);
   audio.addEventListener("ended", stop);
@@ -31,9 +27,14 @@ function play(id: string, url: string) {
   notify();
 }
 
-/** Plays a song's 30s Deezer preview clip; starting one stops any other that's playing. */
-export function usePreviewPlayer(id: string, url: string | null) {
+/**
+ * Plays a song's 30s Deezer preview clip; starting one stops any other
+ * that's playing. The clip URL is a short-lived signed link, so it's
+ * resolved fresh from the server on every play instead of being cached.
+ */
+export function usePreviewPlayer(id: string, hasPreview: boolean) {
   const [isPlaying, setIsPlaying] = useState(() => currentId === id);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     function onChange() {
@@ -46,9 +47,24 @@ export function usePreviewPlayer(id: string, url: string | null) {
     };
   }, [id]);
 
-  const toggle = useCallback(() => {
-    if (url) play(id, url);
-  }, [id, url]);
+  const toggle = useCallback(async () => {
+    if (!hasPreview) return;
+    if (currentId === id) {
+      stop();
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/songs/${id}/preview`);
+      if (!res.ok) return;
+      const data = (await res.json()) as { previewUrl: string | null };
+      if (data.previewUrl) playUrl(id, data.previewUrl);
+    } catch {
+      // ignore — button just stays idle
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, hasPreview]);
 
-  return { isPlaying, toggle };
+  return { isPlaying, isLoading, toggle };
 }

@@ -14,7 +14,7 @@ async function main() {
       song_id text PRIMARY KEY REFERENCES songs(id) ON DELETE CASCADE,
       artist_image text,
       album_image text,
-      preview_url text,
+      has_preview boolean NOT NULL DEFAULT false,
       found boolean NOT NULL,
       fetched_at timestamptz NOT NULL DEFAULT now()
     )
