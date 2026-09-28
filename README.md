@@ -61,8 +61,15 @@ node --env-file=.env.local scripts/add-artwork-table.mjs
 | --- | --- |
 | `POSTGRES_URL` | Connection string pooled (porta 6543), usada em runtime pela aplicação (`src/lib/sql.ts`) |
 | `POSTGRES_URL_NON_POOLING` | Connection string direta (porta 5432), usada só pelo script de migração |
+| `CRON_SECRET` | Protege a rota de keep-alive (abaixo) contra chamadas de fora da Vercel |
 
 No projeto da Vercel essas variáveis já estão configuradas (Production/Preview/Development).
+
+## Keep-alive do Supabase
+
+O projeto do Supabase está no plano gratuito, que **pausa o banco automaticamente após ~7 dias sem uso** — quando isso acontece, toda rota que depende do Postgres passa a travar até estourar o timeout da função (foi exatamente o que gerou o aviso de "execution-time limit" da Vercel).
+
+Para evitar isso sem precisar do plano pago, um [cron job da própria Vercel](https://vercel.com/docs/cron-jobs) chama `GET /api/cron/keep-alive` todo dia às 12:00 UTC (`vercel.json`), que só faz um `SELECT count(*)` na tabela `songs` — suficiente para o Supabase nunca ver 7 dias de inatividade. A rota exige o header `Authorization: Bearer $CRON_SECRET`, que a Vercel envia automaticamente nas chamadas do próprio cron.
 
 ## Estrutura
 
