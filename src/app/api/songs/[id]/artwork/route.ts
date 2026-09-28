@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSongById } from "@/lib/db";
 import { getArtwork } from "@/lib/artwork";
 
+// Room for a cold start + a couple of DB round trips + the Deezer lookup
+// (up to 5s) on a cache miss, comfortably under Vercel's default limit.
+export const maxDuration = 15;
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

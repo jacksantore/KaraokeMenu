@@ -43,7 +43,7 @@ async function queryDeezer(artist: string, title: string): Promise<DeezerLookup 
   const url = `https://api.deezer.com/search?limit=1&q=${encodeURIComponent(query)}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6000);
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return null;

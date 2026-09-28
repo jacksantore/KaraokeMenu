@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchArtwork } from "@/lib/artwork";
 
+// Calls Deezer live — give it room for a cold start plus the round trip
+// (up to 5s) without hitting the default limit.
+export const maxDuration = 15;
+
 /**
  * Live preview lookup used by the cadastro form, before a song has an id
  * to key a cache row on. Not persisted — the real cache write happens via
