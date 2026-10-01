@@ -9,7 +9,7 @@ import SongCard from "@/components/SongCard";
 import EqualizerIcon from "@/components/EqualizerIcon";
 import { searchSongs } from "@/lib/search";
 import type { Song } from "@/lib/types";
-import ListControls, { type PageSize } from "@/components/ListControls";
+import ListControls, { type PageSize, type SortDirection } from "@/components/ListControls";
 
 const RESULT_LIMIT = 60;
 const REDUCE_MOTION_THRESHOLD = 60;
@@ -29,6 +29,7 @@ export default function HomePage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [sortBy, setSortBy] = useState<SortBy>("artist");
+  const [direction, setDirection] = useState<SortDirection>("asc");
   const [browsePage, setBrowsePage] = useState(0);
   const [pageSize, setPageSize] = useState<PageSize>(24);
 
@@ -73,14 +74,17 @@ export default function HomePage() {
 
   const browseSongs = useMemo(() => {
     const copy = [...songs];
+    const sign = direction === "asc" ? 1 : -1;
     copy.sort((a, b) => {
-      if (sortBy === "code") return a.code - b.code;
-      return sortBy === "artist"
-        ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
-        : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
+      if (sortBy === "code") return sign * (a.code - b.code);
+      const primary =
+        sortBy === "artist"
+          ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
+          : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
+      return sign * primary;
     });
     return copy;
-  }, [songs, sortBy]);
+  }, [songs, sortBy, direction]);
 
   const effectivePageSize = pageSize === "all" ? Math.max(browseSongs.length, 1) : pageSize;
   const browsePageCount = Math.max(1, Math.ceil(browseSongs.length / effectivePageSize));
@@ -93,6 +97,11 @@ export default function HomePage() {
 
   function changeSort(next: SortBy) {
     setSortBy(next);
+    setBrowsePage(0);
+  }
+
+  function changeDirection(next: SortDirection) {
+    setDirection(next);
     setBrowsePage(0);
   }
 
@@ -242,6 +251,8 @@ export default function HomePage() {
                 sortBy={sortBy}
                 onSortByChange={changeSort}
                 sortOptions={SORT_OPTIONS}
+                direction={direction}
+                onDirectionChange={changeDirection}
                 pageSize={pageSize}
                 onPageSizeChange={changePageSize}
               />

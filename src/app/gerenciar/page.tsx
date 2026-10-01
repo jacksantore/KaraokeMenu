@@ -19,7 +19,7 @@ import SongFormModal from "@/components/SongFormModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Toaster, { type ToastItem } from "@/components/Toaster";
 import type { Song, SongInput } from "@/lib/types";
-import ListControls, { type PageSize } from "@/components/ListControls";
+import ListControls, { type PageSize, type SortDirection } from "@/components/ListControls";
 
 type SortBy = "artist" | "title" | "code";
 
@@ -34,6 +34,7 @@ export default function GerenciarPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<SortBy>("artist");
+  const [direction, setDirection] = useState<SortDirection>("asc");
   const [pageSize, setPageSize] = useState<PageSize>(24);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,6 +55,11 @@ export default function GerenciarPage() {
     setPage(0);
   }
 
+  function changeDirection(next: SortDirection) {
+    setDirection(next);
+    setPage(0);
+  }
+
   function changePageSize(next: PageSize) {
     setPageSize(next);
     setPage(0);
@@ -70,13 +76,16 @@ export default function GerenciarPage() {
         )
       : songs;
 
+    const sign = direction === "asc" ? 1 : -1;
     return [...base].sort((a, b) => {
-      if (sortBy === "code") return a.code - b.code;
-      return sortBy === "artist"
-        ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
-        : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
+      if (sortBy === "code") return sign * (a.code - b.code);
+      const primary =
+        sortBy === "artist"
+          ? a.artist.localeCompare(b.artist, "pt-BR") || a.title.localeCompare(b.title, "pt-BR")
+          : a.title.localeCompare(b.title, "pt-BR") || a.artist.localeCompare(b.artist, "pt-BR");
+      return sign * primary;
     });
-  }, [songs, query, sortBy]);
+  }, [songs, query, sortBy, direction]);
 
   const effectivePageSize = pageSize === "all" ? Math.max(filtered.length, 1) : pageSize;
   const pageCount = Math.max(1, Math.ceil(filtered.length / effectivePageSize));
@@ -164,6 +173,8 @@ export default function GerenciarPage() {
           sortBy={sortBy}
           onSortByChange={changeSort}
           sortOptions={SORT_OPTIONS}
+          direction={direction}
+          onDirectionChange={changeDirection}
           pageSize={pageSize}
           onPageSizeChange={changePageSize}
         />

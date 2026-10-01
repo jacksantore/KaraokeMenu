@@ -1,9 +1,10 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { LayoutGrid } from "lucide-react";
+import { ArrowDown, ArrowUp, LayoutGrid } from "lucide-react";
 
 export type PageSize = number | "all";
+export type SortDirection = "asc" | "desc";
 
 export const PAGE_SIZE_OPTIONS: PageSize[] = [12, 24, 48, 96, "all"];
 
@@ -17,12 +18,16 @@ export default function ListControls<S extends string>({
   sortBy,
   onSortByChange,
   sortOptions,
+  direction,
+  onDirectionChange,
   pageSize,
   onPageSizeChange,
 }: {
   sortBy: S;
   onSortByChange: (value: S) => void;
   sortOptions: SortOption<S>[];
+  direction: SortDirection;
+  onDirectionChange: (value: SortDirection) => void;
   pageSize: PageSize;
   onPageSizeChange: (value: PageSize) => void;
 }) {
@@ -43,6 +48,14 @@ export default function ListControls<S extends string>({
             <Icon size={12} /> {label}
           </button>
         ))}
+        <button
+          onClick={() => onDirectionChange(direction === "asc" ? "desc" : "asc")}
+          title={direction === "asc" ? "Crescente (A→Z / 0→9)" : "Decrescente (Z→A / 9→0)"}
+          aria-label="Inverter ordem"
+          className="flex items-center gap-1 rounded-full px-3 py-1.5 font-medium text-white/55 transition-colors hover:text-white"
+        >
+          {direction === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+        </button>
       </div>
 
       <label className="flex items-center gap-1.5 rounded-full glass-card px-3 py-1.5 text-xs text-white/55">
