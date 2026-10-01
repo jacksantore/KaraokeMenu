@@ -273,15 +273,15 @@ export default function SongFormModal({
                   <button
                     type="button"
                     onClick={() => {
-                      const q = `${artist} ${title}`.trim();
+                      const q = title.trim();
                       if (!q) return;
                       window.open(
-                        `https://www.letras.mus.br/busca.html?q=${encodeURIComponent(q)}`,
+                        `https://www.letras.mus.br/?q=${encodeURIComponent(q)}`,
                         "_blank",
                         "noopener,noreferrer"
                       );
                     }}
-                    disabled={!canSearchArtwork}
+                    disabled={!title.trim()}
                     title="Abre a busca do letras.mus.br em outra aba — copie e cole o trecho que quiser"
                     className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-neon-cyan transition-colors hover:underline disabled:cursor-not-allowed disabled:text-white/25 disabled:no-underline"
                   >
