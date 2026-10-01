@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Music2, Mic, FileText, Loader2, Hash, ImageIcon, Search } from "lucide-react";
+import { X, Music2, Mic, FileText, Loader2, Hash, ImageIcon, Search, ExternalLink } from "lucide-react";
 import type { Song, SongInput } from "@/lib/types";
 
 interface RawArtwork {
@@ -266,8 +266,27 @@ export default function SongFormModal({
               </div>
 
               <label className="block">
-                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">
-                  <FileText size={13} /> Trecho da letra (opcional)
+                <span className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/50">
+                    <FileText size={13} /> Trecho da letra (opcional)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = `${artist} ${title}`.trim();
+                      if (!q) return;
+                      window.open(
+                        `https://www.letras.mus.br/busca.html?q=${encodeURIComponent(q)}`,
+                        "_blank",
+                        "noopener,noreferrer"
+                      );
+                    }}
+                    disabled={!canSearchArtwork}
+                    title="Abre a busca do letras.mus.br em outra aba — copie e cole o trecho que quiser"
+                    className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-neon-cyan transition-colors hover:underline disabled:cursor-not-allowed disabled:text-white/25 disabled:no-underline"
+                  >
+                    Buscar letra <ExternalLink size={11} />
+                  </button>
                 </span>
                 <textarea
                   value={lyrics}
