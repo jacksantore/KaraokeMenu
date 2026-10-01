@@ -1,6 +1,6 @@
 # Karaokê Menu
 
-Catálogo de músicas do karaokê (Karaokê Party Box) com busca por **nome da música**, **artista**, **código** (o número usado para selecionar a música no equipamento) ou **trecho da letra**, listagem completa ordenável e paginável, capa de álbum/foto do artista buscadas automaticamente, e uma área de **cadastro** para incluir, editar e excluir músicas.
+Catálogo de músicas do karaokê (Karaokê Party Box) com busca por **nome da música**, **artista**, **código** (o número usado para selecionar a música no equipamento) ou **trecho da letra**, listagem completa ordenável e paginável, capa de álbum/foto do artista buscadas automaticamente, detalhes da música/artista (clique no título — compositor, origem, bio) via Wikipédia/MusicBrainz, e uma área de **cadastro** para incluir, editar e excluir músicas.
 
 Em produção: https://karaoke-menu.vercel.app
 
@@ -12,6 +12,7 @@ Em produção: https://karaoke-menu.vercel.app
 - [Fuse.js](https://fusejs.io) para a busca fuzzy (tolera erros de digitação e acentuação)
 - Postgres (Supabase) via [`postgres`](https://github.com/porsager/postgres) para persistência
 - [API pública do Deezer](https://developers.deezer.com/api) para buscar capa do álbum, foto do artista e uma prévia de 30s da música (sem necessidade de chave de API)
+- [Wikipédia (pt)](https://pt.wikipedia.org) e [MusicBrainz](https://musicbrainz.org) para detalhes da música/artista — compositor, origem, bio (também sem chave de API)
 
 ## Rodando localmente
 
@@ -55,6 +56,23 @@ A tabela `song_artwork` é criada por:
 node --env-file=.env.local scripts/add-artwork-table.mjs
 ```
 
+## Detalhes da música/artista
+
+Clicar no título de uma música (`SongCard`) abre um modal (`SongInfoModal`) com informações buscadas sob demanda — só na primeira vez que alguém clica, depois fica em cache na tabela `song_info`:
+
+- **Sobre a música**: quando existe um artigo próprio na Wikipédia em português (comum para sucessos conhecidos), mostra o texto, que frequentemente cita quem compôs a música e sua história — ex. "Evidências" retorna "canção composta por José Augusto e Paulo Sérgio Valle em 1989". Faixas mais obscuras do catálogo não têm artigo próprio; nesse caso essa seção simplesmente não aparece.
+- **Sobre o artista**: biografia da Wikipédia + origem estruturada do MusicBrainz (tipo, cidade/região, país, ano de formação).
+
+Como as consultas combinam duas bases diferentes a partir de um nome de artista digitado em CAIXA ALTA sem acento (vindo do PDF original), `src/lib/songInfo.ts` tem duas camadas de proteção contra resultado errado:
+- usa busca livre (não o `artist:"…"` exato) para tolerar nomes que não batem perfeitamente com o cadastro oficial;
+- só aceita um resultado do MusicBrainz/Wikipédia se o nome encontrado realmente aparece na nossa consulta — sem isso, um "artista" genérico do catálogo (ex. "Anime Beyblade - Abertura", que não é uma banda de verdade) podia bater por coincidência com qualquer artista de nome parecido.
+
+A tabela `song_info` é criada por:
+
+```bash
+node --env-file=.env.local scripts/add-song-info-table.mjs
+```
+
 ## Variáveis de ambiente
 
 | Variável | Uso |
@@ -81,14 +99,20 @@ src/
     api/songs/route.ts               # GET (listar) / POST (criar)
     api/songs/[id]/route.ts          # PUT (editar) / DELETE (excluir)
     api/songs/[id]/artwork/route.ts  # GET (capa/foto, com cache)
-  components/                # UI (cards, modal, navbar, controles de lista, etc.)
+    api/songs/[id]/preview/route.ts  # GET (link de prévia, sempre fresco)
+    api/songs/[id]/info/route.ts     # GET (detalhes música/artista, com cache)
+    api/cron/keep-alive/route.ts     # GET (ping diário pro Supabase não pausar)
+  components/                # UI (cards, modais, navbar, controles de lista, etc.)
   hooks/
     useSongs.ts              # busca e mutações via API
     useArtwork.ts            # busca preguiçosa (IntersectionObserver) de capa/foto
+    usePreviewPlayer.ts      # toca a prévia de 30s (só uma por vez)
+    useSongInfo.ts           # busca detalhes sob demanda (ao abrir o modal)
   lib/
     sql.ts                   # conexão com o Postgres
     db.ts                    # queries (getAllSongs/createSong/updateSong/deleteSong)
     artwork.ts                # busca na API do Deezer + cache em song_artwork
+    songInfo.ts                # busca na Wikipédia/MusicBrainz + cache em song_info
     search.ts                 # lógica de busca (fuzzy + multi-palavra)
     validateSongInput.ts      # validação compartilhada do payload das rotas
     types.ts

@@ -86,10 +86,11 @@ export async function updateSong(id: string, input: SongInput): Promise<Song | n
     `;
     if (!row) return null;
 
-    // Artist/title changed — the cached artwork (if any) no longer matches; drop it
-    // so the next lookup fetches fresh artwork for the new artist/title.
+    // Artist/title changed — any cached artwork/background info no longer
+    // matches; drop it so the next lookup fetches fresh data.
     if (previous && (previous.artist !== row.artist || previous.title !== row.title)) {
       await sql`DELETE FROM song_artwork WHERE song_id = ${id}`;
+      await sql`DELETE FROM song_info WHERE song_id = ${id}`;
     }
 
     return toSong(row);

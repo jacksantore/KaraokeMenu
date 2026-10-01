@@ -7,6 +7,7 @@ import type { Song } from "@/lib/types";
 import { highlightText } from "@/lib/highlight";
 import { useArtwork } from "@/hooks/useArtwork";
 import { usePreviewPlayer } from "@/hooks/usePreviewPlayer";
+import SongInfoModal from "./SongInfoModal";
 
 export interface SongMatches {
   artist?: readonly (readonly [number, number])[];
@@ -55,6 +56,7 @@ export default function SongCard({
   const [albumLoaded, setAlbumLoaded] = useState(false);
   const [albumFailed, setAlbumFailed] = useState(false);
   const [artistFailed, setArtistFailed] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const showAlbumImage = Boolean(artwork?.albumImage) && !albumFailed;
   const showArtistAvatar = Boolean(artwork?.artistImage) && !artistFailed;
@@ -112,9 +114,17 @@ export default function SongCard({
         </div>
 
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-white sm:text-lg">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setInfoOpen(true);
+            }}
+            className="block w-full truncate text-left text-base font-semibold text-white underline decoration-white/0 decoration-2 underline-offset-2 transition-colors hover:decoration-white/40 sm:text-lg"
+            title="Ver detalhes da música"
+          >
             {highlightText(song.title, matches?.title)}
-          </h3>
+          </button>
           <p className="truncate text-sm text-white/60">
             {highlightText(song.artist, matches?.artist)}
           </p>
@@ -159,26 +169,36 @@ export default function SongCard({
     </>
   );
 
+  const infoModal = (
+    <SongInfoModal song={song} open={infoOpen} onClose={() => setInfoOpen(false)} />
+  );
+
   if (reduceMotion) {
     return (
-      <li ref={ref} className="group relative overflow-hidden rounded-2xl glass-card p-4 sm:p-5">
-        {content}
-      </li>
+      <>
+        <li ref={ref} className="group relative overflow-hidden rounded-2xl glass-card p-4 sm:p-5">
+          {content}
+        </li>
+        {infoModal}
+      </>
     );
   }
 
   return (
-    <motion.li
-      ref={ref}
-      layout
-      initial={{ opacity: 0, y: 16, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.98 }}
-      transition={{ duration: 0.28, delay: Math.min(index, 8) * 0.03, ease: "easeOut" }}
-      whileHover={{ y: -3 }}
-      className="group relative overflow-hidden rounded-2xl glass-card p-4 sm:p-5"
-    >
-      {content}
-    </motion.li>
+    <>
+      <motion.li
+        ref={ref}
+        layout
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -8, scale: 0.98 }}
+        transition={{ duration: 0.28, delay: Math.min(index, 8) * 0.03, ease: "easeOut" }}
+        whileHover={{ y: -3 }}
+        className="group relative overflow-hidden rounded-2xl glass-card p-4 sm:p-5"
+      >
+        {content}
+      </motion.li>
+      {infoModal}
+    </>
   );
 }
