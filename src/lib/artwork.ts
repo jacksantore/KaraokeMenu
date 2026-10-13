@@ -1,4 +1,4 @@
-import { sql } from "./sql";
+import { db } from "./sqlite";
 
 export interface ArtworkData {
   artistImage: string | null;
@@ -13,8 +13,8 @@ interface ArtworkRow {
   song_id: string;
   artist_image: string | null;
   album_image: string | null;
-  has_preview: boolean;
-  found: boolean;
+  has_preview: number;
+  found: number;
 }
 
 interface DeezerTrack {
@@ -88,18 +88,19 @@ export async function getFreshPreviewUrl(artist: string, title: string): Promise
  * (not an error) when nothing is found, so callers can render a fallback.
  */
 export async function getArtwork(songId: string, artist: string, title: string): Promise<ArtworkData> {
-  const [cached] = await sql<ArtworkRow[]>`
-    SELECT song_id, artist_image, album_image, has_preview, found
-    FROM song_artwork
-    WHERE song_id = ${songId}
-  `;
+  const cached = db()
+    .prepare(
+      "SELECT song_id, artist_image, album_image, has_preview, found FROM song_artwork WHERE song_id = ?"
+    )
+    .get(songId) as unknown as ArtworkRow | undefined;
+
   // A "not found" result is worth retrying (e.g. after a search-query
   // improvement) — only a confirmed match is trusted as a permanent cache hit.
   if (cached && cached.found) {
     return {
       artistImage: cached.artist_image,
       albumImage: cached.album_image,
-      hasPreview: cached.has_preview,
+      hasPreview: Boolean(cached.has_preview),
     };
   }
 
@@ -110,16 +111,29 @@ export async function getArtwork(songId: string, artist: string, title: string):
   }
 
   const found = Boolean(result.artistImage || result.albumImage);
-  await sql`
-    INSERT INTO song_artwork (song_id, artist_image, album_image, has_preview, found)
-    VALUES (${songId}, ${result.artistImage}, ${result.albumImage}, ${result.hasPreview}, ${found})
-    ON CONFLICT (song_id) DO UPDATE SET
-      artist_image = EXCLUDED.artist_image,
-      album_image = EXCLUDED.album_image,
-      has_preview = EXCLUDED.has_preview,
-      found = EXCLUDED.found,
-      fetched_at = now()
-  `;
+  // The song may have been deleted while the Deezer request was in flight.
+  const stillExists = db().prepare("SELECT 1 FROM songs WHERE id = ?").get(songId);
+  if (stillExists) {
+    db()
+      .prepare(
+        `INSERT INTO song_artwork (song_id, artist_image, album_image, has_preview, found, fetched_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (song_id) DO UPDATE SET
+           artist_image = excluded.artist_image,
+           album_image = excluded.album_image,
+           has_preview = excluded.has_preview,
+           found = excluded.found,
+           fetched_at = excluded.fetched_at`
+      )
+      .run(
+        songId,
+        result.artistImage,
+        result.albumImage,
+        result.hasPreview ? 1 : 0,
+        found ? 1 : 0,
+        new Date().toISOString()
+      );
+  }
 
   return result;
 }

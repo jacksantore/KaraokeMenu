@@ -1,4 +1,4 @@
-import { sql } from "./sql";
+import { db } from "./sqlite";
 
 const USER_AGENT = "KaraokeMenu/1.0 (karaoke catalog app; contato via GitHub jacksantore/KaraokeMenu)";
 
@@ -202,7 +202,7 @@ export async function lookupSongInfo(artist: string, title: string): Promise<Son
 }
 
 interface SongInfoRow {
-  found: boolean;
+  found: number;
   artist_bio: string | null;
   artist_thumbnail: string | null;
   artist_origin: string | null;
@@ -214,7 +214,7 @@ interface SongInfoRow {
 
 function fromRow(row: SongInfoRow): SongInfoData {
   return {
-    found: row.found,
+    found: Boolean(row.found),
     artistBio: row.artist_bio,
     artistThumbnail: row.artist_thumbnail,
     artistOrigin: row.artist_origin,
@@ -227,36 +227,51 @@ function fromRow(row: SongInfoRow): SongInfoData {
 
 /** Cached wrapper around lookupSongInfo — each song is only looked up once. */
 export async function getSongInfo(songId: string, artist: string, title: string): Promise<SongInfoData> {
-  const [cached] = await sql<SongInfoRow[]>`
-    SELECT found, artist_bio, artist_thumbnail, artist_origin, artist_wiki_url,
-           song_extract, song_thumbnail, song_wiki_url
-    FROM song_info
-    WHERE song_id = ${songId}
-  `;
+  const cached = db()
+    .prepare(
+      `SELECT found, artist_bio, artist_thumbnail, artist_origin, artist_wiki_url,
+              song_extract, song_thumbnail, song_wiki_url
+       FROM song_info WHERE song_id = ?`
+    )
+    .get(songId) as unknown as SongInfoRow | undefined;
   if (cached) return fromRow(cached);
 
   const result = await lookupSongInfo(artist, title);
 
-  await sql`
-    INSERT INTO song_info (
-      song_id, artist_bio, artist_thumbnail, artist_origin, artist_wiki_url,
-      song_extract, song_thumbnail, song_wiki_url, found
-    )
-    VALUES (
-      ${songId}, ${result.artistBio}, ${result.artistThumbnail}, ${result.artistOrigin}, ${result.artistWikiUrl},
-      ${result.songExtract}, ${result.songThumbnail}, ${result.songWikiUrl}, ${result.found}
-    )
-    ON CONFLICT (song_id) DO UPDATE SET
-      artist_bio = EXCLUDED.artist_bio,
-      artist_thumbnail = EXCLUDED.artist_thumbnail,
-      artist_origin = EXCLUDED.artist_origin,
-      artist_wiki_url = EXCLUDED.artist_wiki_url,
-      song_extract = EXCLUDED.song_extract,
-      song_thumbnail = EXCLUDED.song_thumbnail,
-      song_wiki_url = EXCLUDED.song_wiki_url,
-      found = EXCLUDED.found,
-      fetched_at = now()
-  `;
+  // The song may have been deleted while the lookups were in flight.
+  const stillExists = db().prepare("SELECT 1 FROM songs WHERE id = ?").get(songId);
+  if (stillExists) {
+    db()
+      .prepare(
+        `INSERT INTO song_info (
+           song_id, artist_bio, artist_thumbnail, artist_origin, artist_wiki_url,
+           song_extract, song_thumbnail, song_wiki_url, found, fetched_at
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (song_id) DO UPDATE SET
+           artist_bio = excluded.artist_bio,
+           artist_thumbnail = excluded.artist_thumbnail,
+           artist_origin = excluded.artist_origin,
+           artist_wiki_url = excluded.artist_wiki_url,
+           song_extract = excluded.song_extract,
+           song_thumbnail = excluded.song_thumbnail,
+           song_wiki_url = excluded.song_wiki_url,
+           found = excluded.found,
+           fetched_at = excluded.fetched_at`
+      )
+      .run(
+        songId,
+        result.artistBio,
+        result.artistThumbnail,
+        result.artistOrigin,
+        result.artistWikiUrl,
+        result.songExtract,
+        result.songThumbnail,
+        result.songWikiUrl,
+        result.found ? 1 : 0,
+        new Date().toISOString()
+      );
+  }
 
   return result;
 }
