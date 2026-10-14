@@ -79,6 +79,7 @@ node --env-file=.env.local scripts/add-song-info-table.mjs
 | --- | --- |
 | `POSTGRES_URL` | Connection string pooled (porta 6543), usada em runtime pela aplicação (`src/lib/sql.ts`) |
 | `POSTGRES_URL_NON_POOLING` | Connection string direta (porta 5432), usada só pelo script de migração |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Usadas só pelo cron de keep-alive para também chamar a API REST do Supabase (a chave anon é pública; com RLS ativo ela não lê nada) |
 | `CRON_SECRET` | Protege a rota de keep-alive (abaixo) contra chamadas de fora da Vercel |
 
 No projeto da Vercel essas variáveis já estão configuradas (Production/Preview/Development).
@@ -87,7 +88,9 @@ No projeto da Vercel essas variáveis já estão configuradas (Production/Previe
 
 O projeto do Supabase está no plano gratuito, que **pausa o banco automaticamente após ~7 dias sem uso** — quando isso acontece, toda rota que depende do Postgres passa a travar até estourar o timeout da função (foi exatamente o que gerou o aviso de "execution-time limit" da Vercel).
 
-Para evitar isso sem precisar do plano pago, um [cron job da própria Vercel](https://vercel.com/docs/cron-jobs) chama `GET /api/cron/keep-alive` todo dia às 12:00 UTC (`vercel.json`), que só faz um `SELECT count(*)` na tabela `songs` — suficiente para o Supabase nunca ver 7 dias de inatividade. A rota exige o header `Authorization: Bearer $CRON_SECRET`, que a Vercel envia automaticamente nas chamadas do próprio cron.
+Para evitar isso sem precisar do plano pago, um [cron job da própria Vercel](https://vercel.com/docs/cron-jobs) chama `GET /api/cron/keep-alive` todo dia às 12:00 UTC (`vercel.json`), que faz um `SELECT count(*)` na tabela `songs` e também uma chamada à API REST do Supabase (`/rest/v1/songs`), para o Supabase nunca ver 7 dias de inatividade, seja ela medida por conexão no banco ou por tráfego na API.
+
+**Segurança (RLS):** as tabelas `songs`, `song_artwork` e `song_info` têm Row Level Security ativado, sem policies. O app conecta direto no Postgres (ignora o RLS), então funciona normalmente; já a API REST pública do Supabase (chave `anon`) não consegue ler nem alterar nada. Tabelas novas precisam do mesmo tratamento: `ALTER TABLE public.<tabela> ENABLE ROW LEVEL SECURITY;`. A rota exige o header `Authorization: Bearer $CRON_SECRET`, que a Vercel envia automaticamente nas chamadas do próprio cron.
 
 ## Estrutura
 
