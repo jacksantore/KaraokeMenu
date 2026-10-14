@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { db } from "./sqlite";
+import { sql } from "./sql";
 import type { Song, SongInput } from "./types";
 
 export class DuplicateCodeError extends Error {
@@ -15,11 +15,9 @@ interface SongRow {
   artist: string;
   title: string;
   lyrics: string;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 }
-
-const SONG_COLUMNS = "id, code, artist, title, lyrics, created_at, updated_at";
 
 function toSong(row: SongRow): Song {
   return {
@@ -28,77 +26,81 @@ function toSong(row: SongRow): Song {
     artist: row.artist,
     title: row.title,
     lyrics: row.lyrics,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
   };
 }
 
 function isUniqueViolation(err: unknown): boolean {
-  return err instanceof Error && /UNIQUE constraint failed/i.test(err.message);
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "23505";
 }
 
 export async function getAllSongs(): Promise<Song[]> {
-  const rows = db()
-    .prepare(`SELECT ${SONG_COLUMNS} FROM songs ORDER BY artist COLLATE NOCASE, title COLLATE NOCASE`)
-    .all() as unknown as SongRow[];
+  const rows = await sql<SongRow[]>`
+    SELECT id, code, artist, title, lyrics, created_at, updated_at
+    FROM songs
+    ORDER BY artist ASC, title ASC
+  `;
   return rows.map(toSong);
 }
 
 export async function getSongById(id: string): Promise<Song | null> {
-  const row = db().prepare(`SELECT ${SONG_COLUMNS} FROM songs WHERE id = ?`).get(id) as unknown as
-    | SongRow
-    | undefined;
+  const [row] = await sql<SongRow[]>`
+    SELECT id, code, artist, title, lyrics, created_at, updated_at
+    FROM songs
+    WHERE id = ${id}
+  `;
   return row ? toSong(row) : null;
 }
 
 export async function createSong(input: SongInput): Promise<Song> {
   const id = nanoid(10);
-  const now = new Date().toISOString();
   try {
-    db()
-      .prepare(
-        `INSERT INTO songs (id, code, artist, title, lyrics, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(id, input.code, input.artist.trim(), input.title.trim(), (input.lyrics ?? "").trim(), now, now);
+    const [row] = await sql<SongRow[]>`
+      INSERT INTO songs (id, code, artist, title, lyrics)
+      VALUES (${id}, ${input.code}, ${input.artist.trim()}, ${input.title.trim()}, ${(input.lyrics ?? "").trim()})
+      RETURNING id, code, artist, title, lyrics, created_at, updated_at
+    `;
+    return toSong(row);
   } catch (err) {
     if (isUniqueViolation(err)) throw new DuplicateCodeError(input.code);
     throw err;
   }
-  return (await getSongById(id))!;
 }
 
 export async function updateSong(id: string, input: SongInput): Promise<Song | null> {
-  const previous = await getSongById(id);
-  if (!previous) return null;
-
-  const artist = input.artist.trim();
-  const title = input.title.trim();
-
   try {
-    db()
-      .prepare(
-        `UPDATE songs
-         SET code = ?, artist = ?, title = ?, lyrics = ?, updated_at = ?
-         WHERE id = ?`
-      )
-      .run(input.code, artist, title, (input.lyrics ?? "").trim(), new Date().toISOString(), id);
+    const [previous] = await sql<Pick<SongRow, "artist" | "title">[]>`
+      SELECT artist, title FROM songs WHERE id = ${id}
+    `;
+
+    const [row] = await sql<SongRow[]>`
+      UPDATE songs
+      SET code = ${input.code},
+          artist = ${input.artist.trim()},
+          title = ${input.title.trim()},
+          lyrics = ${(input.lyrics ?? "").trim()},
+          updated_at = now()
+      WHERE id = ${id}
+      RETURNING id, code, artist, title, lyrics, created_at, updated_at
+    `;
+    if (!row) return null;
+
+    // Artist/title changed — any cached artwork/background info no longer
+    // matches; drop it so the next lookup fetches fresh data.
+    if (previous && (previous.artist !== row.artist || previous.title !== row.title)) {
+      await sql`DELETE FROM song_artwork WHERE song_id = ${id}`;
+      await sql`DELETE FROM song_info WHERE song_id = ${id}`;
+    }
+
+    return toSong(row);
   } catch (err) {
     if (isUniqueViolation(err)) throw new DuplicateCodeError(input.code);
     throw err;
   }
-
-  // Artist/title changed — any cached artwork/background info no longer
-  // matches; drop it so the next lookup fetches fresh data.
-  if (previous.artist !== artist || previous.title !== title) {
-    db().prepare("DELETE FROM song_artwork WHERE song_id = ?").run(id);
-    db().prepare("DELETE FROM song_info WHERE song_id = ?").run(id);
-  }
-
-  return getSongById(id);
 }
 
 export async function deleteSong(id: string): Promise<boolean> {
-  const result = db().prepare("DELETE FROM songs WHERE id = ?").run(id);
-  return Number(result.changes) > 0;
+  const rows = await sql`DELETE FROM songs WHERE id = ${id} RETURNING id`;
+  return rows.length > 0;
 }
