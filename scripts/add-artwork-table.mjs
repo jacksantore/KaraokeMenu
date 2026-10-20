@@ -19,6 +19,14 @@ async function main() {
       fetched_at timestamptz NOT NULL DEFAULT now()
     )
   `;
+  // RLS sem policies: o app conecta direto no Postgres (ignora o RLS), mas a
+  // API REST pública (chave anon) não lê nem altera nada. Os GRANTs explícitos
+  // são necessários porque o Supabase deixou de concedê-los automaticamente
+  // para tabelas novas em "public" (a partir de 30/10/2026).
+  await sql`ALTER TABLE public.song_artwork ENABLE ROW LEVEL SECURITY`;
+  await sql`GRANT SELECT ON public.song_artwork TO anon`;
+  await sql`GRANT SELECT, INSERT, UPDATE, DELETE ON public.song_artwork TO authenticated`;
+  await sql`GRANT SELECT, INSERT, UPDATE, DELETE ON public.song_artwork TO service_role`;
   console.log("Tabela 'song_artwork' pronta.");
   await sql.end({ timeout: 1 });
 }
